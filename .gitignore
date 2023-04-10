@@ -1,0 +1,4 @@
+**.venv
+**.json**
+**_pycache_**
+**.ipynb
