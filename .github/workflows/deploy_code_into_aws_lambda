@@ -1,0 +1,19 @@
+name: deploy_code_into_aws_lambda
+
+on: workflow_dispatch
+
+jobs:
+  deploy_code_into_aws_lambda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: install-aws-cli
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: sh ./install_configure_aws_cli.sh
+      - name: deploy lambda code
+        env:
+          FUNCTION_NAME: ${{ secrets.FUNCTION_NAME }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: sh ./deploy_lambda_image.sh
