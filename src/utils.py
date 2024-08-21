@@ -1,5 +1,8 @@
 import json
 import os
+import re
+import time
+import io
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -73,3 +76,92 @@ def convert_response_to_df(response_dict: Dict[str, Any]) -> pd.DataFrame:
 
     df_response = pd.DataFrame.from_records(records_list)
     return df_response
+
+
+def make_valid_bq_field_names(df):
+    """
+    Transforms the column names of a pandas DataFrame into valid BigQuery field names.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame with original column names.
+    
+    Returns:
+    pd.DataFrame: A new DataFrame with transformed column names.
+    """
+    def _sanitize_column_name(name):
+        # Replace invalid characters with underscores
+        name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+        # Ensure the name starts with a letter or underscore
+        if not re.match(r'^[a-zA-Z_]', name):
+            name = '_' + name
+        return name
+    
+    # Apply the transformation to each column name
+    new_columns = [_sanitize_column_name(col) for col in df.columns]
+    df.columns = new_columns
+    return df
+
+
+def get_data_pipes_from_pipefy(pipe_id, informe_id):
+    BASE_URL = "https://api.pipefy.com/graphql"
+    TOKEN = os.environ['TOKEN_STRING']
+
+    headers = {
+        "accept": "application/json",
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    # First request to export the pipe report
+    payload = {
+        "query": f"""
+            mutation {{
+                exportPipeReport(input: {{pipeId: {pipe_id}, pipeReportId: {informe_id}}}) {{
+                    pipeReportExport {{id}}
+                }}
+            }}
+        """
+    }
+
+    response = requests.post(BASE_URL, json=payload, headers=headers)
+    dict_response = response.json()
+    id_response = dict_response['data']['exportPipeReport']['pipeReportExport']['id']
+
+    # Second request to get the file URL
+    payload = {
+        "query": f"""
+            {{
+                pipeReportExport(id: "{id_response}") {{
+                    fileURL
+                    state
+                    startedAt
+                    requestedBy {{id}}
+                }}
+            }}
+        """
+    }
+
+    response = requests.post(BASE_URL, json=payload, headers=headers)
+    dict_response = response.json()
+    URL_download = dict_response['data']['pipeReportExport']['fileURL']
+
+    # Download the file with retries
+    tries = 0
+    while tries < 10:
+        response = requests.get(URL_download, stream=True)
+        if response.status_code == 404:
+            time.sleep(10)
+            tries += 1
+        else:
+            break
+
+    file_content = response.content
+    bytes_io = io.BytesIO(file_content)
+
+    # Read the Excel file using pandas
+    df = pd.read_excel(bytes_io, engine='openpyxl')
+    df = df.replace(r'\[([^]]+)\]', value=r'\1', regex=True)
+    df = df.replace(r'\[|\]', value=r'', regex=True)
+
+    return df
+
