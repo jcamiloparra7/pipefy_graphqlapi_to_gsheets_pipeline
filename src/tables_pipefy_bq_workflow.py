@@ -14,7 +14,7 @@ def main():
 
     gc = gspread.authorize(credentials)
 
-    config_base_datos = gc.open_by_key(config_gsheet_id).get_worksheet(1)
+    config_base_datos = gc.open_by_key(config_gsheet_id).get_worksheet(0)
 
     db_config_df = get_as_dataframe(config_base_datos)
 
