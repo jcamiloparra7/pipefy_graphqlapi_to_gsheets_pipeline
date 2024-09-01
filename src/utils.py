@@ -103,8 +103,6 @@ def make_valid_bq_field_names(df):
 
 
 def get_data_pipes_from_pipefy(pipe_id, informe_id):
-    BASE_URL = "https://api.pipefy.com/graphql"
-    TOKEN = os.environ['TOKEN_STRING']
 
     headers = {
         "accept": "application/json",
